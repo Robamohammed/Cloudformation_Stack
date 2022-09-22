@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create cloud formation template
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Description: VPC definition
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      Tags:
+        -
+          Key: Name
+          Value: Custome Vpc
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref VPC
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  InternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn:
+      - GatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      GatewayId: !Ref InternetGateway
+      DestinationCidrBlock: 0.0.0.0/0
+  SubnetRouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet
+  Ec2Instance1:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - InternetRoute
+      - SubnetRouteTableAssoc
+    Properties:
+      InstanceType: t2.micro
+      SubnetId: !Ref Subnet
+      ImageId: ami-0022f774911c1d690
+      SecurityGroupIds:
+        - !GetAtt SecurityGroup1.GroupId
+      Tags:
+        - Key: Name
+          Value: Instance1
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/sh
+            sudo yum update -y
+            sudo yum install httpd -y
+            sudo chmod -R 777 /var/www/html
+            cd /var/www/html
+            sudo systemctl start httpd
+            sudo systemctl enable httpd
+    Ec2Instance2:
+      Type: AWS::EC2::Instance
+      DependsOn:
+        - InternetRoute
+        - SubnetRouteTableAssoc
+      Properties:
+        InstanceType: t2.micro
+        SubnetId: !Ref Subnet
+        ImageId: ami-0022f774911c1d690
+        SecurityGroupIds:
+          - !GetAtt SecurityGroup2.GroupId
+        Tags:
+          - Key: Name
+            Value: Instance2
+        UserData:
+          Fn::Base64:
+            !Sub |
+              #!/bin/sh
+              sudo yum update -y
+              sudo yum install httpd -y
+              sudo chmod -R 777 /var/www/html
+              cd /var/www/html
+              sudo systemctl start httpd
+              sudo systemctl enable httpd
+    SecurityGroup1:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Security group #1
+        GroupName: securegrp1
+        VpcId: !Ref VPC
+        SecurityGroupIngress:
+          - CidrIp: 0.0.0.0/0
+            IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+    SecurityGroup2:
+      Type: AWS::EC2::SecurityGroup #2
+      Properties:
+        GroupDescription: Allow http to client host and ssh to own ip
+        GroupName: securegrp2
+        VpcId: !Ref VPC
+        SecurityGroupIngress:
+          - CidrIp: 0.0.0.0/0
+            IpProtocol: tcp
+            FromPort: 22
+            ToPort: 22
